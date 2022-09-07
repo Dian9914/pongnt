@@ -18,7 +18,7 @@ static bool s_pause_flag = false;
 static AppTimer *s_main_timer;
 
 // constants
-#define PAD_LENGTH 18
+#define PAD_LENGTH 22
 
 //BUTTON RELATED CALLS
 //center
@@ -36,7 +36,7 @@ static void prv_select_click_handler(ClickRecognizerRef recognizer, void *contex
 static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
   // Moves the player position up only if unpaused
   if (s_pause_flag){
-    s_player_pose = s_player_pose - 2;
+    s_player_pose = s_player_pose - 4;
   }
 }
 
@@ -44,7 +44,7 @@ static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
 static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   // Moves the player position down only if unpaused
   if (s_pause_flag){
-    s_player_pose = s_player_pose + 2;  
+    s_player_pose = s_player_pose + 4;  
   }
 }
 
@@ -73,6 +73,7 @@ static void player_update_proc(Layer *layer, GContext *ctx) {
 //ball movement management
 static void ball_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
+  int bounce_point;
 
   // Calculate the ball speed
   // Wall bouncing
@@ -84,10 +85,38 @@ static void ball_update_proc(Layer *layer, GContext *ctx) {
     s_ball_x_pose = bounds.size.w-3;
     s_ball_x_speed = -s_ball_x_speed;
   }
+
+  if (s_ball_y_pose <= 0){
+    s_ball_y_pose = 0;
+    s_ball_y_speed = -s_ball_y_speed;
+  }
+  else if (s_ball_y_pose >= bounds.size.h-3){
+    s_ball_y_pose = bounds.size.h-3;
+    s_ball_y_speed = -s_ball_y_speed;
+  }
+
   // Player bouncing
   if (s_ball_x_pose <= 8 && s_ball_y_pose>=s_player_pose-2 && s_ball_y_pose<=s_player_pose+PAD_LENGTH){
     s_ball_x_pose = 8;
-    s_ball_x_speed = -s_ball_x_speed;
+    // when the ball bounces on the player, it will always have a x_speed of 5 towards the enemy
+    s_ball_x_speed = 5;
+
+    //the y speed is calculated depending on where the ball hits the player
+    bounce_point = (s_ball_y_pose + 1 - s_player_pose);
+    switch (bounce_point)
+    {
+    case -1:
+      s_ball_y_speed = -5;
+      break;
+
+    case PAD_LENGTH:
+      s_ball_y_speed = 5;
+      break;
+
+    default:
+      s_ball_y_speed = ((bounce_point * 8 ) / PAD_LENGTH) - 4;
+      break;
+    }
   }
   // Draw the new ball
   graphics_context_set_fill_color(ctx, GColorBlack);
