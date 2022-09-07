@@ -5,11 +5,20 @@
 static Window *s_main_window;
 // general layers
 static Layer *s_player_layer;
+static Layer *s_ball_layer;
 // general variables
+static int s_total_time = 0;
 static int s_player_pose;
+static int s_ball_y_pose;
+static int s_ball_y_speed;
+static int s_ball_x_pose;
+static int s_ball_x_speed;
 static bool s_pause_flag = false;
 // timers
 static AppTimer *s_main_timer;
+
+// constants
+#define PAD_LENGTH 18
 
 //BUTTON RELATED CALLS
 //center
@@ -25,14 +34,18 @@ static void prv_select_click_handler(ClickRecognizerRef recognizer, void *contex
 
 //up
 static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  // Moves the player position up
-  s_player_pose = s_player_pose - 2;
+  // Moves the player position up only if unpaused
+  if (s_pause_flag){
+    s_player_pose = s_player_pose - 2;
+  }
 }
 
 //down
 static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  // Moves the player position down
-  s_player_pose = s_player_pose + 2;
+  // Moves the player position down only if unpaused
+  if (s_pause_flag){
+    s_player_pose = s_player_pose + 2;  
+  }
 }
 
 //BUTTON RELATED CALLBACKS CONFIGURATION
@@ -42,7 +55,8 @@ static void prv_click_config_provider(void *context) {
   window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 50, prv_down_click_handler);
 }
 
-//PLAYER PAD MANAGEMENT
+//MOVING ITEMS MANAGEMENT
+//player movement management
 static void player_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
 
@@ -52,16 +66,48 @@ static void player_update_proc(Layer *layer, GContext *ctx) {
 
   // Draw the new bar
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(0, s_player_pose, 3, 18), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(0, s_player_pose, 3, PAD_LENGTH), 0, GCornerNone);
+
+}
+
+//ball movement management
+static void ball_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+
+  // Calculate the ball speed
+  // Wall bouncing
+  if (s_ball_x_pose <= 0){
+    s_ball_x_pose = 0;
+    s_ball_x_speed = -s_ball_x_speed;
+  }
+  else if (s_ball_x_pose >= bounds.size.w-3){
+    s_ball_x_pose = bounds.size.w-3;
+    s_ball_x_speed = -s_ball_x_speed;
+  }
+  // Player bouncing
+  if (s_ball_x_pose <= 8 && s_ball_y_pose>=s_player_pose-2 && s_ball_y_pose<=s_player_pose+PAD_LENGTH){
+    s_ball_x_pose = 8;
+    s_ball_x_speed = -s_ball_x_speed;
+  }
+  // Draw the new ball
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, GRect(s_ball_x_pose, s_ball_y_pose, 3, 3), 0, GCornerNone);
 
 }
 
 // TIME RELATED CALLS
 static void update_screen(void *data){
+  s_total_time++;
   // Resets timer
   s_main_timer = app_timer_register(50, update_screen, false);
-  // Update screen
-  layer_mark_dirty(window_get_root_layer(s_main_window));
+  // Calculate the new ball position only if unpaused
+  if (s_pause_flag){
+    s_ball_x_pose = s_ball_x_pose + s_ball_x_speed;
+    s_ball_y_pose = s_ball_y_pose + s_ball_y_speed;
+    
+    // Update screen only if unpaused
+    layer_mark_dirty(window_get_root_layer(s_main_window));
+  }
 }
 
 //WINDOW INIT
@@ -83,6 +129,23 @@ static void prv_window_load(Window *window) {
 
   // Add to Window
   layer_add_child(window_get_root_layer(window), s_player_layer);
+
+  //BALL
+  //pose initialization. Initial ball movement is random, giving priority to player
+  s_ball_y_pose = 60;
+  s_ball_x_pose = 60;
+  s_ball_x_speed = (s_total_time%3 * 2) - 2;
+  if (s_ball_x_speed==0){
+    s_ball_x_speed = -2;
+  }
+  s_ball_y_speed = 0;
+  //create a layer where the ball can move
+  s_ball_layer = layer_create(GRect(0, 25, bounds.size.w, 120));
+  //set a callback that will be called each time the ball is redrawn
+  layer_set_update_proc(s_ball_layer, ball_update_proc);
+
+  // Add to Window
+  layer_add_child(window_get_root_layer(window), s_ball_layer);
 
 }
 
@@ -112,6 +175,7 @@ static void prv_init(void) {
 static void prv_deinit(void) {
   // destroy all layers
   layer_destroy(s_player_layer);
+  layer_destroy(s_ball_layer);
   // destroy window
   window_destroy(s_main_window);
 }
