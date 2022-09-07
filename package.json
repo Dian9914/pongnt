@@ -6,15 +6,12 @@
   "private": true,
   "dependencies": {},
   "pebble": {
-    "displayName": "pongt",
+    "displayName": "Pongn't",
     "uuid": "88dc91e1-eaf1-415c-847a-29b24d1343e7",
     "sdkVersion": "3",
     "enableMultiJS": true,
     "targetPlatforms": [
-      "aplite",
-      "basalt",
-      "chalk",
-      "diorite"
+      "aplite"
     ],
     "watchapp": {
       "watchface": false
