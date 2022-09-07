@@ -13,6 +13,8 @@ static BitmapLayer *s_background_layer;
 static GBitmap *s_background_bitmap;
 // general variables
 static int s_total_time = 0;
+static int s_player_points = 0;
+static int s_enemy_points = 0;
 static int s_player_pose;
 static int s_enemy_pose;
 static int s_ball_y_pose;
@@ -102,12 +104,24 @@ static void ball_update_proc(Layer *layer, GContext *ctx) {
   // Calculate the ball speed
   // Wall bouncing
   if (s_ball_x_pose <= 0){
-    s_ball_x_pose = 0;
-    s_ball_x_speed = -s_ball_x_speed;
+    s_ball_x_pose = bounds.size.w / 2;
+    s_ball_y_pose = bounds.size.h / 2;
+    s_player_pose = (bounds.size.h - PAD_LENGTH) / 2;
+    s_enemy_pose = (bounds.size.h - PAD_LENGTH) / 2;
+    s_ball_x_speed = 2;
+    s_ball_y_speed = (s_total_time % 5) - 2;
+    s_enemy_points++;
+    s_pause_flag = false;
   }
   else if (s_ball_x_pose >= bounds.size.w-3){
-    s_ball_x_pose = bounds.size.w-3;
-    s_ball_x_speed = -s_ball_x_speed;
+    s_ball_x_pose = bounds.size.w / 2;
+    s_ball_y_pose = bounds.size.h / 2;
+    s_player_pose = (bounds.size.h - PAD_LENGTH) / 2;
+    s_enemy_pose = (bounds.size.h - PAD_LENGTH) / 2;
+    s_ball_x_speed = -2;
+    s_ball_y_speed = (s_total_time % 5) - 2;
+    s_player_points++;
+    s_pause_flag = false;
   }
 
   if (s_ball_y_pose <= 0){
