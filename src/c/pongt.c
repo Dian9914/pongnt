@@ -7,6 +7,9 @@ static Window *s_main_window;
 static Layer *s_player_layer;
 static Layer *s_enemy_layer;
 static Layer *s_ball_layer;
+// layers for texts
+static TextLayer *s_player_points_layer;
+static TextLayer *s_enemy_points_layer;
 // layers for images
 static BitmapLayer *s_background_layer;
 // images
@@ -15,6 +18,8 @@ static GBitmap *s_background_bitmap;
 static int s_total_time = 0;
 static int s_player_points = 0;
 static int s_enemy_points = 0;
+static char s_player_points_str[] = "00000000000";
+static char s_enemy_points_str[] = "00000000000";
 static int s_player_pose;
 static int s_enemy_pose;
 static int s_ball_y_pose;
@@ -104,24 +109,30 @@ static void ball_update_proc(Layer *layer, GContext *ctx) {
   // Calculate the ball speed
   // Wall bouncing
   if (s_ball_x_pose <= 0){
-    s_ball_x_pose = bounds.size.w / 2;
-    s_ball_y_pose = bounds.size.h / 2;
+    s_ball_x_pose = (bounds.size.w / 2) - 2;
+    s_ball_y_pose = (bounds.size.h / 2) - 2;
     s_player_pose = (bounds.size.h - PAD_LENGTH) / 2;
     s_enemy_pose = (bounds.size.h - PAD_LENGTH) / 2;
     s_ball_x_speed = 2;
     s_ball_y_speed = (s_total_time % 5) - 2;
     s_enemy_points++;
     s_pause_flag = false;
+    // Display the points on the text layer
+    snprintf(s_enemy_points_str, sizeof(s_enemy_points_str), "%d", s_enemy_points);
+    text_layer_set_text(s_enemy_points_layer, s_enemy_points_str);
   }
   else if (s_ball_x_pose >= bounds.size.w-3){
-    s_ball_x_pose = bounds.size.w / 2;
-    s_ball_y_pose = bounds.size.h / 2;
+    s_ball_x_pose = (bounds.size.w / 2) - 2;
+    s_ball_y_pose = (bounds.size.h / 2) - 2;
     s_player_pose = (bounds.size.h - PAD_LENGTH) / 2;
     s_enemy_pose = (bounds.size.h - PAD_LENGTH) / 2;
     s_ball_x_speed = -2;
     s_ball_y_speed = (s_total_time % 5) - 2;
     s_player_points++;
     s_pause_flag = false;
+    // Display the points on the text layer
+    snprintf(s_player_points_str, sizeof(s_player_points_str), "%d", s_player_points);
+    text_layer_set_text(s_player_points_layer, s_player_points_str);
   }
 
   if (s_ball_y_pose <= 0){
@@ -198,14 +209,14 @@ static void update_screen(void *data){
     s_ball_y_pose = s_ball_y_pose + s_ball_y_speed;
 
     // Move the enemy towards the ball
-    if (s_ball_y_pose > s_enemy_pose){ 
+    if (s_ball_y_pose > (s_enemy_pose + (3*PAD_LENGTH/4))){ 
       if (s_enemy_pose<=120-PAD_LENGTH){
-        s_enemy_pose = s_enemy_pose + 4;  
+        s_enemy_pose = s_enemy_pose + 3;  
       }
     }
-    else{ 
+    else if(s_ball_y_pose < (s_enemy_pose + (PAD_LENGTH/4))){ 
       if (s_enemy_pose>=0){
-        s_enemy_pose = s_enemy_pose - 4;
+        s_enemy_pose = s_enemy_pose - 3;
       }
     }
     
@@ -241,7 +252,7 @@ static void prv_window_load(Window *window) {
   layer_set_update_proc(s_player_layer, player_update_proc);
 
   // Add to Window
-  layer_add_child(window_get_root_layer(window), s_player_layer);
+  layer_add_child(window_layer, s_player_layer);
 
 
   //ENEMY
@@ -253,12 +264,12 @@ static void prv_window_load(Window *window) {
   layer_set_update_proc(s_enemy_layer, enemy_update_proc);
 
   // Add to Window
-  layer_add_child(window_get_root_layer(window), s_enemy_layer);
+  layer_add_child(window_layer, s_enemy_layer);
 
   //BALL
   //pose initialization. Initial ball movement is random, giving priority to player
-  s_ball_y_pose = 60;
-  s_ball_x_pose = 60;
+  s_ball_x_pose = (bounds.size.w / 2) - 2;
+  s_ball_y_pose = 24 + 60 - 2;
   s_ball_x_speed = (s_total_time % 3 * 2) - 2;
   if (s_ball_x_speed==0){
     s_ball_x_speed = -2;
@@ -270,7 +281,48 @@ static void prv_window_load(Window *window) {
   layer_set_update_proc(s_ball_layer, ball_update_proc);
 
   // Add to Window
-  layer_add_child(window_get_root_layer(window), s_ball_layer);
+  layer_add_child(window_layer, s_ball_layer);
+
+  // POINTS TEXT LAYER
+  // player points
+  // Create the TextLayer with specific bounds
+  s_player_points_layer = text_layer_create(
+      GRect(5, 3, 20, 20)
+  );
+
+  // Improve the layout to be more like a watchface
+  text_layer_set_background_color(s_player_points_layer, GColorBlack);
+  text_layer_set_text_color(s_player_points_layer, GColorClear);
+  text_layer_set_text_alignment(s_player_points_layer, GTextAlignmentCenter);
+  text_layer_set_font(s_player_points_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+
+  // Display the points on the text layer
+  snprintf(s_player_points_str, sizeof(s_player_points_str), "%d", s_player_points);
+  text_layer_set_text(s_player_points_layer, s_player_points_str);
+
+  // Add it as a child layer to the window's root layer
+  layer_add_child(window_layer, text_layer_get_layer(s_player_points_layer));
+
+
+  // enemy points
+  // Create the TextLayer with specific bounds
+  s_enemy_points_layer = text_layer_create(
+      GRect(bounds.size.w-25, 3, 20, 20)
+  );
+
+  // Improve the layout to be more like a watchface
+  text_layer_set_background_color(s_enemy_points_layer, GColorBlack);
+  text_layer_set_text_color(s_enemy_points_layer, GColorClear);
+  text_layer_set_text_alignment(s_enemy_points_layer, GTextAlignmentCenter);
+  text_layer_set_font(s_enemy_points_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+
+  // Display the points on the text layer
+  snprintf(s_enemy_points_str, sizeof(s_enemy_points_str), "%d", s_enemy_points);
+  text_layer_set_text(s_enemy_points_layer, s_enemy_points_str);
+
+  // Add it as a child layer to the window's root layer
+  layer_add_child(window_layer, text_layer_get_layer(s_enemy_points_layer));
+
 
 }
 
