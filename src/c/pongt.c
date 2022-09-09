@@ -7,9 +7,11 @@ static Window *s_main_window;
 static Layer *s_player_layer;
 static Layer *s_enemy_layer;
 static Layer *s_ball_layer;
+static Layer *s_pause_layer;
 // layers for texts
 static TextLayer *s_player_points_layer;
 static TextLayer *s_enemy_points_layer;
+static TextLayer *s_pause_layer_text;
 // layers for images
 static BitmapLayer *s_background_layer;
 // images
@@ -26,7 +28,7 @@ static int s_ball_y_pose;
 static int s_ball_y_speed;
 static int s_ball_x_pose;
 static int s_ball_x_speed;
-static bool s_pause_flag = false;
+static bool s_unpaused_flag = false;
 // timers
 static AppTimer *s_main_timer;
 
@@ -37,18 +39,21 @@ static AppTimer *s_main_timer;
 //center
 static void prv_select_click_handler(ClickRecognizerRef recognizer, void *context) {
   // Pauses and unpauses the game
-  if (s_pause_flag){
-    s_pause_flag = false;
+  if (s_unpaused_flag){
+    s_unpaused_flag = false;
+    layer_set_hidden(s_pause_layer, false);
+    text_layer_set_text(s_pause_layer_text, "Paused!\nPress > to continue!");
   }
   else{
-    s_pause_flag = true;
-    }
+    s_unpaused_flag = true;
+    layer_set_hidden(s_pause_layer, true);
+  }
 }
 
 //up
 static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
   // Moves the player position up only if unpaused
-  if (s_pause_flag){
+  if (s_unpaused_flag){
     if (s_player_pose>=0){
       s_player_pose = s_player_pose - 4;
     }
@@ -58,7 +63,7 @@ static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
 //down
 static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   // Moves the player position down only if unpaused
-  if (s_pause_flag){
+  if (s_unpaused_flag){
     if (s_player_pose<=120-PAD_LENGTH){
       s_player_pose = s_player_pose + 4;  
     }
@@ -70,6 +75,24 @@ static void prv_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_click_handler);
   window_single_repeating_click_subscribe(BUTTON_ID_UP, 50, prv_up_click_handler);
   window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 50, prv_down_click_handler);
+}
+
+// MENU MANAGEMENT
+static void pause_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+
+  // If the game is paused, we draw the menu. If it isnt, we dont draw anything
+  if (!s_unpaused_flag){
+    // We draw a rectangle
+    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+
+    // Draw the new bar
+    graphics_context_set_fill_color(ctx, GColorWhite);
+    graphics_fill_rect(ctx, GRect(5, 5, bounds.size.w-10, bounds.size.h-10), 0, GCornerNone);
+
+    // Set the menu text depending on the context
+  }
 }
 
 //MOVING ITEMS MANAGEMENT
@@ -116,7 +139,9 @@ static void ball_update_proc(Layer *layer, GContext *ctx) {
     s_ball_x_speed = 2;
     s_ball_y_speed = (s_total_time % 5) - 2;
     s_enemy_points++;
-    s_pause_flag = false;
+    s_unpaused_flag = false;
+    layer_set_hidden(s_pause_layer, false);
+    text_layer_set_text(s_pause_layer_text, "Too bad! \nPress > to continue!");
     // Display the points on the text layer
     snprintf(s_enemy_points_str, sizeof(s_enemy_points_str), "%d", s_enemy_points);
     text_layer_set_text(s_enemy_points_layer, s_enemy_points_str);
@@ -129,7 +154,9 @@ static void ball_update_proc(Layer *layer, GContext *ctx) {
     s_ball_x_speed = -2;
     s_ball_y_speed = (s_total_time % 5) - 2;
     s_player_points++;
-    s_pause_flag = false;
+    s_unpaused_flag = false;
+    layer_set_hidden(s_pause_layer, false);
+    text_layer_set_text(s_pause_layer_text, "Well done! \nPress > to continue!");
     // Display the points on the text layer
     snprintf(s_player_points_str, sizeof(s_player_points_str), "%d", s_player_points);
     text_layer_set_text(s_player_points_layer, s_player_points_str);
@@ -204,7 +231,7 @@ static void update_screen(void *data){
   // Resets timer
   s_main_timer = app_timer_register(50, update_screen, false);
   // Calculate the new ball position only if unpaused
-  if (s_pause_flag){
+  if (s_unpaused_flag){
     s_ball_x_pose = s_ball_x_pose + s_ball_x_speed;
     s_ball_y_pose = s_ball_y_pose + s_ball_y_speed;
 
@@ -310,7 +337,7 @@ static void prv_window_load(Window *window) {
       GRect(bounds.size.w-25, 3, 20, 20)
   );
 
-  // Improve the layout to be more like a watchface
+  // Set the textlayer options
   text_layer_set_background_color(s_enemy_points_layer, GColorBlack);
   text_layer_set_text_color(s_enemy_points_layer, GColorClear);
   text_layer_set_text_alignment(s_enemy_points_layer, GTextAlignmentCenter);
@@ -323,11 +350,41 @@ static void prv_window_load(Window *window) {
   // Add it as a child layer to the window's root layer
   layer_add_child(window_layer, text_layer_get_layer(s_enemy_points_layer));
 
+  //PAUSE MENU
+  //create a layer where the pause menu will pop up
+  s_pause_layer = layer_create(GRect(24, 48, bounds.size.w-48, 120-48));
+  //set a callback that will be called each time the screen is redrawn
+  layer_set_update_proc(s_pause_layer, pause_update_proc);
 
+  // Add to Window
+  layer_add_child(window_layer, s_pause_layer);
+
+  //create a layer where the text on the pause menu will be displayed
+  s_pause_layer_text = text_layer_create(
+      GRect(0, 5, bounds.size.w-48, 120-48)
+  );
+
+  // Set the textlayer options
+  text_layer_set_background_color(s_pause_layer_text, GColorClear);
+  text_layer_set_text_color(s_pause_layer_text, GColorBlack);
+  text_layer_set_text_alignment(s_pause_layer_text, GTextAlignmentCenter);
+  text_layer_set_overflow_mode(s_pause_layer_text, GTextOverflowModeTrailingEllipsis);
+  text_layer_set_font(s_pause_layer_text, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+
+  // Display the initial text (tutorial)
+  text_layer_set_text(s_pause_layer_text, "Welcome! \nPress > to play!");
+
+  // Add to pause menu layer
+  layer_add_child(s_pause_layer, text_layer_get_layer(s_pause_layer_text));
 }
 
 // WINDOW DEINIT
 static void prv_window_unload(Window *window) {
+  // Destroy textlayers
+  text_layer_destroy(s_player_points_layer);
+  text_layer_destroy(s_enemy_points_layer);
+  text_layer_destroy(s_pause_layer_text);
+
   // Destroy GBitmap
   gbitmap_destroy(s_background_bitmap);
     
@@ -360,6 +417,7 @@ static void prv_deinit(void) {
   layer_destroy(s_player_layer);
   layer_destroy(s_enemy_layer);
   layer_destroy(s_ball_layer);
+  layer_destroy(s_pause_layer);
   // destroy window
   window_destroy(s_main_window);
 }
