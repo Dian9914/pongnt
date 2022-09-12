@@ -34,6 +34,26 @@ static AppTimer *s_main_timer;
 
 // constants
 #define PAD_LENGTH 22
+#define WIN_POINTS 7
+
+//GENERIC FUNCTIONS
+static void reset_pose (GRect bounds) {
+    s_ball_x_pose = (bounds.size.w / 2) - 2;
+    s_ball_y_pose = (bounds.size.h / 2) - 2;
+    s_player_pose = (bounds.size.h - PAD_LENGTH) / 2;
+    s_enemy_pose = (bounds.size.h - PAD_LENGTH) / 2;
+}
+
+static void game_restart (GRect bounds) {
+    reset_pose(bounds);
+    s_ball_x_speed = (s_total_time % 3 * 2) - 2;
+    if (s_ball_x_speed==0){
+      s_ball_x_speed = -2;
+    }
+    s_ball_y_speed = (s_total_time % 5) - 2;
+    s_player_points = 0;
+    s_enemy_points = 0;
+}
 
 //BUTTON RELATED CALLS
 //center
@@ -131,35 +151,53 @@ static void ball_update_proc(Layer *layer, GContext *ctx) {
 
   // Calculate the ball speed
   // Wall bouncing
+  // enemy scores
   if (s_ball_x_pose <= 0){
-    s_ball_x_pose = (bounds.size.w / 2) - 2;
-    s_ball_y_pose = (bounds.size.h / 2) - 2;
-    s_player_pose = (bounds.size.h - PAD_LENGTH) / 2;
-    s_enemy_pose = (bounds.size.h - PAD_LENGTH) / 2;
+    //we reset the position of everything and the speed of the ball
+    reset_pose(bounds);
     s_ball_x_speed = 2;
     s_ball_y_speed = (s_total_time % 5) - 2;
+    //we increase enemy total points
     s_enemy_points++;
+    //we pause the game and display a message. If you lost, the game restarts
     s_unpaused_flag = false;
     layer_set_hidden(s_pause_layer, false);
-    text_layer_set_text(s_pause_layer_text, "Too bad! \nPress > to continue!");
-    // Display the points on the text layer
+    if (s_enemy_points >= WIN_POINTS){
+      text_layer_set_text(s_pause_layer_text, "YOU LOSE! \U0001F4A9\nPress > to restart!");
+      game_restart(bounds);
+    }
+    else{
+      text_layer_set_text(s_pause_layer_text, "Too bad! \U0001F614\nPress > to continue!");
+    }
+    // Display the total points on the text layer
+    snprintf(s_player_points_str, sizeof(s_player_points_str), "%d", s_player_points);
+    text_layer_set_text(s_player_points_layer, s_player_points_str);
     snprintf(s_enemy_points_str, sizeof(s_enemy_points_str), "%d", s_enemy_points);
     text_layer_set_text(s_enemy_points_layer, s_enemy_points_str);
   }
+  //player scores
   else if (s_ball_x_pose >= bounds.size.w-3){
-    s_ball_x_pose = (bounds.size.w / 2) - 2;
-    s_ball_y_pose = (bounds.size.h / 2) - 2;
-    s_player_pose = (bounds.size.h - PAD_LENGTH) / 2;
-    s_enemy_pose = (bounds.size.h - PAD_LENGTH) / 2;
+    //we reset the position of everything and the speed of the ball
+    reset_pose(bounds);
     s_ball_x_speed = -2;
     s_ball_y_speed = (s_total_time % 5) - 2;
+    //we increase player total points
     s_player_points++;
+    //we pause the game and display a message. If you won, the game restarts
     s_unpaused_flag = false;
     layer_set_hidden(s_pause_layer, false);
-    text_layer_set_text(s_pause_layer_text, "Well done! \nPress > to continue!");
+    if (s_player_points >= WIN_POINTS){
+      text_layer_set_text(s_pause_layer_text, "YOU WIN! \U0001F389\nPress > to restart!");
+      game_restart(bounds);
+    }
+    else{
+      text_layer_set_text(s_pause_layer_text, "Well done! \U0001F603\nPress > to continue!");
+    }
     // Display the points on the text layer
     snprintf(s_player_points_str, sizeof(s_player_points_str), "%d", s_player_points);
     text_layer_set_text(s_player_points_layer, s_player_points_str);
+    snprintf(s_enemy_points_str, sizeof(s_enemy_points_str), "%d", s_enemy_points);
+    text_layer_set_text(s_enemy_points_layer, s_enemy_points_str);
   }
 
   if (s_ball_y_pose <= 0){
